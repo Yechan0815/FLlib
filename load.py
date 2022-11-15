@@ -25,6 +25,6 @@ serv = c_module.server_wait
 serv.argtypes = (ctypes.c_int, )
 serv.restype = None
 
-serv(10);
+serv(2);
 
 print ('done')

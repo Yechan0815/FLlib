@@ -1,7 +1,8 @@
-#ifndef _SERVER_H_
-# define _SERVER_H_
+#ifndef _F_SERVER_H_
+# define _F_SERVER_H_
 
 # include <thread>
+# include <map>
 # include <unistd.h>
 # include <netinet/in.h>
 # include <sys/socket.h>
@@ -9,6 +10,7 @@
 # include <stdio.h>
 # include <string.h>
 # include <errno.h>
+# include "Response.h"
 
 enum class Status
 {
@@ -38,6 +40,8 @@ private:
 
 	int epollFd;
 	struct epoll_event *events;
+
+	std::map<int, Response *> clients;
 };
 
 #endif

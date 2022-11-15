@@ -8,6 +8,8 @@ static Server * server = nullptr;
 Server::Server ()
 {
 	status = Status::WAITING;
+	/* map */
+	clients.clear();
 }
 
 Server::~Server ()
@@ -75,9 +77,13 @@ void Server::Wait (int queue)
 				clientFd = accept (socketFd, (struct sockaddr *) &caddr, &clen);
 				if (clientFd < 0)
 					throw std::runtime_error ("Server module: accept: 71 line");
+				/* new client */
+				clients.insert (std::pair<int, Response *>(clientFd, new Response));
 				::write (clientFd, "input? ", 7);
 			}
 		}
+		if (clients.size() == queue)
+			break;
 	}
 }
 
