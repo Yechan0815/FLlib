@@ -12,7 +12,17 @@ Server::Server ()
 
 Server::~Server ()
 {
-	std::cout << "destruct" << std::endl;
+	char buf[2] = { (char) TCode::Terminate, 0 };
+	/* send close signal to clients */
+	Broadcast (buf, 1);
+	/* close */
+	for (std::map<int, Response *>::iterator it = clients.begin (); it != clients.end (); ++it)
+	{
+		::close (it->first);
+		delete it->second;
+	}
+	::close (socketFd);
+	delete[] events;
 }
 
 /* public */
@@ -54,7 +64,7 @@ bool Server::Listen (int port, int queue)
 
 void Server::Wait (int queue)
 {
-	char handshake[10] = { (char) TCode::SYN, 0, };	
+	char handshake[13] = { (char) TCode::SYN, 0, };	
 	char buf[16];
 	struct epoll_event event;
 	struct sockaddr_in caddr;
@@ -80,9 +90,10 @@ void Server::Wait (int queue)
 				if (clientFd < 0)
 					throw std::runtime_error ("Server module: accept: 73 line");
 				/* handshake */
-				*((unsigned int *)(handshake + 1)) = 4;
-				*((int *)(handshake + 5)) = clients.size();
-				::write (clientFd, handshake, 9);
+				*((unsigned int *)(handshake + 1)) = 8;
+				*((int *)(handshake + 5)) = queue;
+				*((int *)(handshake + 9)) = clients.size();
+				::write (clientFd, handshake, 13);
 				/* new client */
 				clients.insert (std::pair<int, Response *>(clientFd, new Response));
 				clients[clientFd]->SetIndex (clients.size() - 1);
@@ -90,7 +101,7 @@ void Server::Wait (int queue)
 				event.events = EPOLLIN;
                 event.data.fd = clientFd;
 				if (epoll_ctl (epollFd, EPOLL_CTL_ADD, clientFd, &event) < 0)
-					throw std::runtime_error ("Server module: epoll_ctl: 88 line");
+					throw std::runtime_error ("Server module: epoll_ctl: 93 line");
 				continue;
             }
 			/* client */
@@ -105,6 +116,9 @@ void Server::Wait (int queue)
 				if (buf[0] == (char) TCode::ACK)
 				{
 					std::cout << "handshake with client index " << clients[events[i].data.fd]->GetIndex () << std::endl;
+					event.data.fd = events[i].data.fd;
+					if (epoll_ctl (epollFd, EPOLL_CTL_DEL, event.data.fd, &event) < 0)
+						throw std::runtime_error ("Server module: epoll_ctl: 119 line");
 					++conn;
 				}
 				else
@@ -112,6 +126,52 @@ void Server::Wait (int queue)
 			}
 		}
 		if (conn == queue)
+			break;
+	}
+}
+
+void Server::Broadcast (char * buf, unsigned int length)
+{
+	struct epoll_event event;
+	std::map<int, Request> requests;
+	unsigned int bytes;
+	int ready;
+
+	for (std::map<int, Response *>::iterator it = clients.begin (); it != clients.end (); ++it)
+	{
+		/* add epoll */
+		event.events = EPOLLOUT;
+		event.data.fd = it->first;
+		if (epoll_ctl (epollFd, EPOLL_CTL_ADD, it->first, &event) < 0)
+			throw std::runtime_error ("Server module: epoll_ctl: 141 line");
+		requests.insert (std::pair<int, Request>(it->first, Request ()));
+		requests[it->first].length = length;
+		requests[it->first].offset = 0;
+	}
+
+	while (1)
+	{
+		ready = epoll_wait (epollFd, events, requests.size(), -1);
+		if (ready < 0)
+			throw std::runtime_error ("Server module: epoll_wait: 149 line");
+
+		for (int i = 0; i < ready; ++i)
+		{
+			if (events[i].events & EPOLLOUT)
+			{
+				bytes = ::write (events[i].data.fd, buf + requests[events[i].data.fd].offset,
+						length - requests[events[i].data.fd].offset);
+				requests[events[i].data.fd].offset += bytes;
+				if (requests[events[i].data.fd].offset == length)
+				{
+					event.data.fd = events[i].data.fd;
+					if (epoll_ctl (epollFd, EPOLL_CTL_DEL, events[i].data.fd, &event) < 0)
+						throw std::runtime_error ("Server module: epoll_ctl: 166 line");
+					requests.erase (events[i].data.fd);
+				}
+			}
+		}
+		if (requests.size() == 0)
 			break;
 	}
 }
@@ -139,7 +199,8 @@ extern "C"
 
 	void server_destroy ()
 	{
-		delete server;
+		if (server)
+			delete server;
 	}
 
 	wchar_t* serv()

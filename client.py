@@ -15,6 +15,7 @@ class TCode (Enum):
 	Ignore = 3
 	Unicast = 4
 	Broadcast = 5
+	Terminate = 6
 
 # bridge
 class Bridge:
@@ -30,8 +31,8 @@ class Bridge:
 		self.client_connect.restype = ctypes.c_bool
 
 		self.client_handshake = module.client_handshake;
-		self.client_handshake.argtypes = None
-		self.client_handshake.restype = ctypes.c_int
+		self.client_handshake.argtypes = (ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int))
+		self.client_handshake.restype = None 
 
 		self.client_signal = module.client_signal;
 		self.client_signal.argtypes = None
@@ -40,6 +41,7 @@ class Bridge:
 # model
 class ClientModel:
 	def __init__ (self):
+		self.total = -1
 		self.index = -1
 
 	def load (self):
@@ -83,8 +85,8 @@ class ClientModel:
 		return self.model.get_weights ()
 
 	def fit (self):
-		batch_size = 128
 		epochs = 1
+		batch_size = 128
 		self.model.fit(self.x_train, self.y_train, batch_size=batch_size, epochs=epochs, validation_split=0.1)
 
 	def evaluate (self):
@@ -94,6 +96,8 @@ class ClientModel:
 
 class Client:
 	def __init__ (self, host, port):
+		self.total = -1
+		self.index = -1
 		self.host = host
 		self.port = port
 		# resource
@@ -110,15 +114,30 @@ class Client:
 			raise Exception('Failed to connect to server')
 		print ("Connect to server successfully")
 		# handshake
-		index = self.bridge.client_handshake ()
-		if index < 0:
+		out_total = ctypes.c_int ()
+		out_index = ctypes.c_int ()
+		self.bridge.client_handshake (out_total, out_index)
+		if out_total.value < 0:
 			raise Exception('Failed to handshaek')
-		print ("Successful handshake with server: Assigned client index: {}".format(index))
+		self.total = out_total.value
+		self.index = out_index.value
+		self.model.total = self.total
+		self.model.index = self.index
+		print ("Successful handshake with server: Assigned client index: {}/0-{}".format(self.index, self.total - 1))
 
 	def run (self):
 		while True:
-			print (1)
+			signal = self.bridge.client_signal ()
+			if signal == TCode.Select.value:
+				self.model.fit ()
+			elif signal == TCode.Ignore.value:
+				print ("ignore")
+			elif signal == TCode.Terminate.value:
+				break
 
+	def destroy (self):
+		print ("destroy")
+			
 """
 import json
 
@@ -128,3 +147,4 @@ print (js)
 client = Client ("127.0.0.1", 4242)
 client.load ()
 client.run ()
+client.destroy ()

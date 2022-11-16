@@ -5,6 +5,10 @@
 /* # CODE # # BYTE # # BODY # */
 /* ######## ######## ######## */
 
+/* ######## ######## ######### ######### */
+/* # CODE # # BYTE # # TOTAL # # INDEX # */
+/* ######## ######## ######### ######### */
+
 /* transfer code */
 enum class TCode
 {
@@ -16,7 +20,9 @@ enum class TCode
 	Ignore,
 	/* model */
 	Unicast,
-	Broadcast
+	Broadcast,
+	/* end */
+	Terminate
 };
 
 #endif

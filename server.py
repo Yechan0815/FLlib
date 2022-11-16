@@ -15,6 +15,7 @@ class TCode (Enum):
 	Ignore = 3
 	Unicast = 4
 	Broadcast = 5
+	Terminate = 6
 
 # bridge
 class Bridge:
@@ -32,6 +33,10 @@ class Bridge:
 		self.server_wait = module.server_wait
 		self.server_wait.argtypes = (ctypes.c_int, )
 		self.server_wait.restype = None
+
+		self.server_destroy = module.server_destroy
+		self.server_destroy.argtypes = None
+		self.server_destroy.restype = None
 
 # model
 class ServerModel:
@@ -107,13 +112,33 @@ class Server:
 		print ("Started the server")
 
 	def until_client (self, queue):
+		print ("Waiting for clients...")
 		self.bridge.server_wait (queue)
 		print ("A total of {} clients connected".format (queue))
 
 	def run (self):
 		while True:
-			print (1)
+			print ("")
+			print ("Choose an action to execute")
+			print ("1. Federeated Learning (FedAvg)")
+			print ("2. Evaluate the model")
+			print ("4. Exit")
+			select = int (input ("Please enter the number: "))
+			if (select == 1):
+				print ("Federated")
+			elif (select == 2):
+				print ("evaluate")
+			elif (select == 4):
+				break
+			else:
+				print ("Invalid input")
 
-server = Server (4242, 10)
+	def destroy (self):
+		self.bridge.server_destroy ()
+
+# entry
+server = Server (4242, 42)
 server.load ()
-server.until_client (2)
+server.until_client (int (input ("Enter the number of clients to use: ")))
+server.run ()
+server.destroy ()

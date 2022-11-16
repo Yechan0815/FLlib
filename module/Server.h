@@ -12,6 +12,7 @@
 # include <string.h>
 # include <errno.h>
 # include "Response.h"
+# include "Request.h"
 # include "protocol.h"
 
 enum class Status
@@ -30,6 +31,8 @@ public:
 	bool Init ();
 	bool Listen (int port, int queue);
 	void Wait (int queue);
+
+	void Broadcast (char * buf, unsigned int length);
 
 private:
 	

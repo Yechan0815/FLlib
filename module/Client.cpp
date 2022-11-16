@@ -1,10 +1,4 @@
 #include "Client.h"
-#include <locale>
-#include <codecvt>
-#include <errno.h>
-#include <string.h>
-
-#include <iostream>
 
 static Client * client = nullptr;
 
@@ -14,7 +8,7 @@ Client::Client ()
 }
 
 Client::~Client ()
-{
+{	
 }
 
 /* public */
@@ -62,7 +56,7 @@ int Client::Read (char ** out_buf)
 
 	/* get length */
 	if ((bytes = ::read (socketFd, buf, 4)) < 0)
-		throw std::runtime_error ("client module: Read: 64 line");
+		throw std::runtime_error ("client module: Read: 58 line");
 	length = *((unsigned int *) buf);
 	/* read body */
 	offset = 0;
@@ -70,7 +64,7 @@ int Client::Read (char ** out_buf)
 	while (offset != length)
 	{
 		if ((bytes = ::read (socketFd, buf, length - offset)) < 0)
-			throw std::runtime_error ("client module: Read: 72 line");
+			throw std::runtime_error ("client module: Read: 67 line");
 		for (unsigned int i = 0; i < bytes; ++i)
 			buffer[offset + i] = buf[i];
 		offset += bytes;
@@ -117,27 +111,36 @@ extern "C"
 		return client->Connect (ws_to_s (host).c_str(), port);
 	}
 
-	int client_handshake ()
+	void client_handshake (int * total, int * index)
 	{
 		char ack_buf[2] = { (char) TCode::ACK, 0 };
 		char * buf;
-		int index;
 
 		/* SYN from server */
 		if (client->Signal () != (int) TCode::SYN)
-			return -1;
+		{
+			*total = -1;
+			*index = -1;
+			return;
+		}
 		/* read index */
 		client->Read (&buf);
-		index = *((int *) buf);
+		*total = *((int *) buf);
+		*index = *((int *) (buf + 4));
 		/* destroy */
 		delete[] buf;
 		/* send ACK */
 		client->Write(ack_buf, 1);
-		return index;
 	}
 
 	int client_signal ()
 	{
 		return client->Signal ();
+	}
+
+	void client_destroy ()
+	{
+		if (client)
+			delete client;
 	}
 }

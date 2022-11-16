@@ -1,11 +1,16 @@
 #ifndef _F_CLIENT_H_
 # define _F_CLIENT_H_
 
+# include <locale>
+# include <codecvt>
+# include <iostream>
+# include <string.h>
 # include <sys/socket.h>
 # include <unistd.h>
 # include <stdio.h>
 # include <netinet/in.h>
 # include <arpa/inet.h>
+# include <errno.h>
 # include "protocol.h"
 
 class Client
