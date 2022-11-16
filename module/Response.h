@@ -13,6 +13,7 @@ public:
 	void Buffering (char * buf, unsigned int bytes);
 
 	void SetSize (unsigned int size);
+	void SetIndex (int index);
 
 	char * GetBuffer ();
 
@@ -21,6 +22,7 @@ private:
 
 private:
 	int clientFd;
+	int index;
 
 	unsigned int size;
 	unsigned int offset;

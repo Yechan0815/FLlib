@@ -1,5 +1,3 @@
-#include <iostream>
-#include <map> // socket:block
 #include "Server.h"
 
 static Server * server = nullptr;
@@ -37,10 +35,7 @@ bool Server::Listen (int port, int queue)
 	address.sin_addr.s_addr = htonl(INADDR_ANY);
 
 	if (::bind (socketFd, (struct sockaddr *) &address, sizeof (address)) == -1)
-	{
-		std::cout << strerror(errno) << std::endl;
 		return false;
-	}
 	
 	if (::listen (socketFd, queue) == -1)
 		return false;
@@ -59,6 +54,7 @@ bool Server::Listen (int port, int queue)
 
 void Server::Wait (int queue)
 {
+	char handshake[10] = { (char) TCode::SYN, 0, };	
 	struct sockaddr_in caddr;
 	socklen_t clen;
 	int clientFd;
@@ -68,18 +64,26 @@ void Server::Wait (int queue)
 	{
 		ready = epoll_wait (epollFd, events, queue, -1);
 		if (ready < 0)
-			throw std::runtime_error ("Server module: epoll_wait: 61 line");
+			throw std::runtime_error ("Server module: epoll_wait: 65 line");
 
 		for (int i = 0; i < ready; ++i)
 		{
 			if (events[i].data.fd == socketFd)
 			{
+				clen = sizeof (caddr);
 				clientFd = accept (socketFd, (struct sockaddr *) &caddr, &clen);
 				if (clientFd < 0)
-					throw std::runtime_error ("Server module: accept: 71 line");
+				{
+					std::cout << strerror(errno) << std::endl;
+					throw std::runtime_error ("Server module: accept: 73 line");
+				}
+				/* handshake */
+				*((unsigned int *)(handshake + 1)) = 4;
+				*((int *)(handshake + 5)) = clients.size();
+				::write (clientFd, handshake, 9);
 				/* new client */
 				clients.insert (std::pair<int, Response *>(clientFd, new Response));
-				::write (clientFd, "input? ", 7);
+				clients[clientFd]->SetIndex (clients.size() - 1);
 			}
 		}
 		if (clients.size() == queue)
@@ -87,7 +91,6 @@ void Server::Wait (int queue)
 	}
 }
 
-/* export method */
 extern "C"
 {
 	bool server_init ()

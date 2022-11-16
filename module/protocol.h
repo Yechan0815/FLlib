@@ -1,13 +1,20 @@
 #ifndef _F_PROTOCOL_H_
 # define _F_PROTOCOL_H_
 
+/* ######## ######## ######## */
+/* # CODE # # BYTE # # BODY # */
+/* ######## ######## ######## */
+
 /* transfer code */
 enum class TCode
 {
-	/* Round */
+	/* handshake */
+	SYN,
+	ACK,
+	/* round */
 	Select,
 	Ignore,
-	/* Model */
+	/* model */
 	Unicast,
 	Broadcast
 };

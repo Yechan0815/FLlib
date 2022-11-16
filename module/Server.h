@@ -1,6 +1,7 @@
 #ifndef _F_SERVER_H_
 # define _F_SERVER_H_
 
+# include <iostream>
 # include <thread>
 # include <map>
 # include <unistd.h>
@@ -11,6 +12,7 @@
 # include <string.h>
 # include <errno.h>
 # include "Response.h"
+# include "protocol.h"
 
 enum class Status
 {

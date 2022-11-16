@@ -45,6 +45,11 @@ void Response::SetSize (unsigned int size)
 	this->size = size;
 }
 
+void Response::SetIndex (int idx)
+{
+	index = idx;
+}
+
 char * Response::GetBuffer ()
 {
 	buffer[offset] = 0;
