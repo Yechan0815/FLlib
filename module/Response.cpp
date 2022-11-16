@@ -50,6 +50,11 @@ void Response::SetIndex (int idx)
 	index = idx;
 }
 
+int Response::GetIndex ()
+{
+	return index;
+}
+
 char * Response::GetBuffer ()
 {
 	buffer[offset] = 0;

@@ -14,6 +14,7 @@ public:
 
 	void SetSize (unsigned int size);
 	void SetIndex (int index);
+	int GetIndex ();
 
 	char * GetBuffer ();
 

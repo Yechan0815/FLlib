@@ -55,11 +55,16 @@ bool Server::Listen (int port, int queue)
 void Server::Wait (int queue)
 {
 	char handshake[10] = { (char) TCode::SYN, 0, };	
+	char buf[16];
+	struct epoll_event event;
 	struct sockaddr_in caddr;
 	socklen_t clen;
 	int clientFd;
 	int ready;
+	unsigned int bytes;
+	int conn;
 
+	conn = 0;
 	while (1)
 	{
 		ready = epoll_wait (epollFd, events, queue, -1);
@@ -73,10 +78,7 @@ void Server::Wait (int queue)
 				clen = sizeof (caddr);
 				clientFd = accept (socketFd, (struct sockaddr *) &caddr, &clen);
 				if (clientFd < 0)
-				{
-					std::cout << strerror(errno) << std::endl;
 					throw std::runtime_error ("Server module: accept: 73 line");
-				}
 				/* handshake */
 				*((unsigned int *)(handshake + 1)) = 4;
 				*((int *)(handshake + 5)) = clients.size();
@@ -84,9 +86,32 @@ void Server::Wait (int queue)
 				/* new client */
 				clients.insert (std::pair<int, Response *>(clientFd, new Response));
 				clients[clientFd]->SetIndex (clients.size() - 1);
+				/* add epoll */
+				event.events = EPOLLIN;
+                event.data.fd = clientFd;
+				if (epoll_ctl (epollFd, EPOLL_CTL_ADD, clientFd, &event) < 0)
+					throw std::runtime_error ("Server module: epoll_ctl: 88 line");
+				continue;
+            }
+			/* client */
+			if (events[i].events & EPOLLIN)
+			{
+				buf[0] = -1;
+				bytes = ::read (events[i].data.fd, buf, 1);
+				if (bytes < 0)
+					throw std::runtime_error ("Server module: read: 99 line");
+				if (bytes == 0)
+					throw std::runtime_error ("Server module: disconnected with client");
+				if (buf[0] == (char) TCode::ACK)
+				{
+					std::cout << "handshake with client index " << clients[events[i].data.fd]->GetIndex () << std::endl;
+					++conn;
+				}
+				else
+					throw std::runtime_error ("Server Module: client performed an undefined action during the handshake");
 			}
 		}
-		if (clients.size() == queue)
+		if (conn == queue)
 			break;
 	}
 }
