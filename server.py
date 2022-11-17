@@ -1,4 +1,5 @@
 from enum import Enum
+import json
 import ctypes
 import ssl
 import numpy as np
@@ -82,6 +83,9 @@ class ServerModel:
 	
 	def get_weights (self):
 		return self.model.get_weights ()
+	
+	def set_weights (self, weights):
+		self.model.set_weights (weights)
 
 	def fit (self):
 		batch_size = 128
@@ -100,6 +104,9 @@ class Server:
 		# resource
 		self.model = ServerModel ()
 		self.bridge = Bridge ("./libc_server.so")
+		# FL
+		self.total = -1
+		self.weights_average = []
 
 	def load (self):
 		# model
@@ -115,6 +122,43 @@ class Server:
 		print ("Waiting for clients...")
 		self.bridge.server_wait (queue)
 		print ("A total of {} clients connected".format (queue))
+		self.total = queue
+
+	def federated_learning (self):
+		# Weights
+		self.weights_average = []
+		# Client
+		epoch = int (input ("epoch?: "))
+		weights_size = len (self.model.get_weights ())
+		weights_offset = 0
+
+		# Federated Learning
+		self.bridge.server_FL_start (epoch) # < send fl start (broadcast)
+		# Receive weights of all clients that has selected in this round
+		while weights_offset == weights_size:
+			weights_json = self.bridge.server_FL_receive_json_each () # < json of array
+			# calculate the average
+			avg = json.loads (weights_json[0])
+			for index in range (1, self.total):
+				avg += json.loads (weights_json[index])
+			avg = avg / self.total
+			self.weights_average.append (avg)
+			# next
+			weights_offset += 1
+
+		# update the model of server
+		self.model.set_weights (self.weights_average)
+
+		# update the model of client
+		weights_size = len (self.model.get_weights ())
+		weights_offset = 0	
+		# Send
+		while weights_offset == weights_size:
+			weights_json = json.dumps (self.model.get_weights ()[weights_offset].tolist())
+			self.bridge.server_FL_send_json_each (weights_json) # < send weights of the model of server (broadcast)
+			# next
+			weights_offset += 1
+			
 
 	def run (self):
 		while True:
@@ -125,9 +169,9 @@ class Server:
 			print ("4. Exit")
 			select = int (input ("Please enter the number: "))
 			if (select == 1):
-				print ("Federated")
+				self.federated_learning ()
 			elif (select == 2):
-				print ("evaluate")
+				self.model.evaluate ()
 			elif (select == 4):
 				break
 			else:

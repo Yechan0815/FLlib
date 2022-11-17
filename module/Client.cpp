@@ -9,6 +9,7 @@ Client::Client ()
 
 Client::~Client ()
 {	
+	::close (socketFd);
 }
 
 /* public */
@@ -136,6 +137,19 @@ extern "C"
 	int client_signal ()
 	{
 		return client->Signal ();
+	}
+
+	int client_epoch ()
+	{
+		char * buf;
+		int epoch;
+
+		/* read epoch */
+		client->Read (&buf);
+		epoch = *((int *) buf);	
+		delete[] buf;
+
+		return epoch;
 	}
 
 	void client_destroy ()

@@ -1,4 +1,5 @@
 from enum import Enum
+import json
 import ssl
 import ctypes
 import numpy as np
@@ -22,21 +23,29 @@ class Bridge:
 	def __init__ (self, path):
 		module = ctypes.cdll.LoadLibrary(path)
 
-		self.client_init = module.client_init;
+		self.client_init = module.client_init
 		self.client_init.argtypes = None
 		self.client_init.restype = ctypes.c_bool
 
-		self.client_connect = module.client_connect;
+		self.client_connect = module.client_connect
 		self.client_connect.argtypes = (ctypes.c_wchar_p, ctypes.c_int)
 		self.client_connect.restype = ctypes.c_bool
 
-		self.client_handshake = module.client_handshake;
+		self.client_handshake = module.client_handshake
 		self.client_handshake.argtypes = (ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int))
 		self.client_handshake.restype = None 
 
-		self.client_signal = module.client_signal;
+		self.client_signal = module.client_signal
 		self.client_signal.argtypes = None
 		self.client_signal.restype = ctypes.c_int
+
+		self.client_epoch = module.client_epoch
+		self.client_epoch.argtypes = None
+		self.client_epoch.restype = ctypes.c_int
+		
+		self.client_destroy = module.client_destroy
+		self.client_destroy.argtypes = None
+		self.client_destroy.restype = None
 
 # model
 class ClientModel:
@@ -84,10 +93,20 @@ class ClientModel:
 	def get_weights (self):
 		return self.model.get_weights ()
 
-	def fit (self):
-		epochs = 1
+	def set_weights (self, weights):
+		self.model.set_weights (weights)
+
+	def fit (self, epochs):
 		batch_size = 128
-		self.model.fit(self.x_train, self.y_train, batch_size=batch_size, epochs=epochs, validation_split=0.1)
+
+		train_size = int(len(self.x_train) / self.total)
+		self.model.fit(
+			self.x_train[train_size * self.index:train_size * (self.index + 1)],
+			self.y_train[train_size * self.index:train_size * (self.index + 1)],
+			batch_size=batch_size,
+			epochs=epochs,
+			validation_split=0.2
+		)
 
 	def evaluate (self):
 		score = self.model.evaluate(self.x_test, self.y_test, verbose=0)
@@ -107,12 +126,14 @@ class Client:
 	def load (self):
 		# model
 		self.model.load ()
+
 		# socket
 		if not self.bridge.client_init ():
 			raise Exception('Failed to initialize socket resource')
 		if not self.bridge.client_connect (self.host, self.port):
 			raise Exception('Failed to connect to server')
 		print ("Connect to server successfully")
+
 		# handshake
 		out_total = ctypes.c_int ()
 		out_index = ctypes.c_int ()
@@ -124,26 +145,53 @@ class Client:
 		self.model.total = self.total
 		self.model.index = self.index
 		print ("Successful handshake with server: Assigned client index: {}/0-{}".format(self.index, self.total - 1))
+	
+	def select (self):
+		# Learning
+		epoch = self.bridge.client_epoch ()
+		print ('epoch:', epoch)
+		self.model.fit (epoch)
+		# Send weights of the model
+		weights_size = len (self.model.get_weights ())
+		weights_offset = 0	
+		# Send
+		while weights_offset == weights_size:
+			weights_json = json.dumps (self.model.get_weights ()[weights_offset].tolist())
+			self.bridge.client_FL_send_json_each (weights_json) # < send weights of the model of client
+			# next
+			weights_offset += 1
+
+	def update_model (self):
+		# Receive
+		weights_size = len (self.model.get_weights ())
+		weights_offset = 0
+
+		weights = []
+		# Receive weights of all clients that has selected in this round
+		while weights_offset == weights_size:
+			weights_json = self.bridge.client_FL_receive_json_each () # < json
+			# calculate the average
+			weights.append (json.loads (weights_json))
+			# next
+			weights_offset += 1
+		self.model.set_weights (weights)
 
 	def run (self):
 		while True:
 			signal = self.bridge.client_signal ()
 			if signal == TCode.Select.value:
-				self.model.fit ()
+				self.select ()
 			elif signal == TCode.Ignore.value:
 				print ("ignore")
+			elif signal == TCode.Broadcast.value:
+				self.update_model ()
 			elif signal == TCode.Terminate.value:
+				print ("broadcasted close signal from server")
 				break
 
 	def destroy (self):
-		print ("destroy")
+		self.bridge.client_destroy ()
 			
-"""
-import json
-
-js = json.dumps (model.get_weights()[0].tolist())
-print (js)
-	"""
 client = Client ("127.0.0.1", 4242)
 client.load ()
 client.run ()
