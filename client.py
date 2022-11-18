@@ -39,9 +39,15 @@ class Bridge:
 		self.client_signal.argtypes = None
 		self.client_signal.restype = ctypes.c_int
 
-		self.client_epoch = module.client_epoch
-		self.client_epoch.argtypes = None
-		self.client_epoch.restype = ctypes.c_int
+		self.client_get_fl_data = module.client_get_fl_data
+		self.client_get_fl_data.argtypes = (
+				ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int)
+		)
+		self.client_get_fl_data.restype = None
+
+		self.client_send_weight_json = module.client_send_weight_json
+		self.client_send_weight_json.argtypes = (ctypes.c_wchar_p, )
+		self.client_send_weight_json.restype = ctypes.c_bool
 		
 		self.client_destroy = module.client_destroy
 		self.client_destroy.argtypes = None
@@ -99,7 +105,9 @@ class ClientModel:
 	def fit (self, epochs):
 		batch_size = 128
 
-		train_size = int(len(self.x_train) / self.total)
+		train_size = int (len (self.x_train) / self.total)
+
+		print ("Dataset {}-{}/{}".format (train_size * self.index, train_size * (self.index + 1), len (self.x_train)))
 		self.model.fit(
 			self.x_train[train_size * self.index:train_size * (self.index + 1)],
 			self.y_train[train_size * self.index:train_size * (self.index + 1)],
@@ -147,20 +155,34 @@ class Client:
 		print ("Successful handshake with server: Assigned client index: {}/0-{}".format(self.index, self.total - 1))
 	
 	def select (self):
+		# get requirements
+		out_participants_select = ctypes.c_int ()
+		out_participants_ignore = ctypes.c_int ()
+		out_epoch = ctypes.c_int ()
+		self.bridge.client_get_fl_data (out_participants_select, out_participants_ignore, out_epoch)
+
+		print ("Client index {} was selected for this round of federated learning".format (self.index))
+		print ("> Total number of clients: {}".format (self.total))
+		print ("> Number of Participants: {}".format (out_participants_select.value))
+		print ("> Number of Non-participants: {}".format (out_participants_ignore.value))
+		print ("> Client Index: {}".format (self.index))
+		print ("> Required Epoch: {}".format (out_epoch.value))
+
 		# Learning
-		epoch = self.bridge.client_epoch ()
-		print ('epoch:', epoch)
-		self.model.fit (epoch)
-		# Send weights of the model
+		self.model.fit (out_epoch.value)
+
+		# Send weights of the model of this client
 		weights_size = len (self.model.get_weights ())
-		weights_offset = 0	
+		weights_offset = 0
 		# Send
-		while weights_offset == weights_size:
+		while weights_offset != weights_size:
 			weights_json = json.dumps (self.model.get_weights ()[weights_offset].tolist())
-			self.bridge.client_FL_send_json_each (weights_json) # < send weights of the model of client
+			self.bridge.client_send_weight_json (weights_json)
 			# next
 			weights_offset += 1
+			print ("Sending weights to server {}/{}".format (weights_offset, weights_size))
 
+	"""
 	def update_model (self):
 		# Receive
 		weights_size = len (self.model.get_weights ())
@@ -175,6 +197,19 @@ class Client:
 			# next
 			weights_offset += 1
 		self.model.set_weights (weights)
+	"""
+
+	def ignore (self):
+		# get requirements
+		out_participants_select = ctypes.c_int ()
+		out_participants_ignore = ctypes.c_int ()
+		self.bridge.client_get_fl_data (out_participants_select, out_participants_ignore, None)
+
+		print ("Client index {} was not selected for this round of federated learning".format (self.index))
+		print ("> Total number of clients: {}".format (self.total))
+		print ("> Number of Participants: {}".format (out_participants_select.value))
+		print ("> Number of Non-participants: {}".format (out_participants_ignore.value))
+		print ("> Client Index: {}".format (self.index))
 
 	def run (self):
 		while True:
@@ -182,11 +217,11 @@ class Client:
 			if signal == TCode.Select.value:
 				self.select ()
 			elif signal == TCode.Ignore.value:
-				print ("ignore")
+				self.ignore ()
 			elif signal == TCode.Broadcast.value:
 				self.update_model ()
 			elif signal == TCode.Terminate.value:
-				print ("broadcasted close signal from server")
+				print ("Close signal was broadcasted from server")
 				break
 
 	def destroy (self):

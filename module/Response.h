@@ -9,10 +9,18 @@ public:
 
 	void SetSocket (int fd);
 
-	void Init ();
+	void Init (unsigned int len = 16);
 	void Buffering (char * buf, unsigned int bytes);
 
+	void SetBHead (bool bhead);
+	bool GetBHead ();
+
 	void SetSize (unsigned int size);
+	unsigned int GetSize ();
+
+	void SetOffset (unsigned int offset);
+	unsigned int GetOffset ();
+
 	void SetIndex (int index);
 	int GetIndex ();
 
@@ -22,6 +30,8 @@ private:
 	void expand (unsigned int threshold);
 
 private:
+	bool head;
+
 	int clientFd;
 	int index;
 

@@ -24,7 +24,7 @@ public:
 
 	int Signal ();
 	int Read (char ** buf);
-	void Write (char * buf, unsigned int length);
+	void Write (const char * buf, unsigned int length);
 
 private:
 	int socketFd;

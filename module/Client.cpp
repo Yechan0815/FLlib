@@ -42,7 +42,7 @@ int Client::Signal ()
 	int signal;
 
 	if ((bytes = ::read (socketFd, buf, 1)) < 0)
-		throw std::runtime_error ("client module: Signal: 49 line");
+		throw std::runtime_error ("client module: Signal: 44 line");
 	signal = (int) buf[0];
 	return signal;
 }
@@ -75,7 +75,7 @@ int Client::Read (char ** out_buf)
 	return offset;
 }
 
-void Client::Write (char * buf, unsigned int length)
+void Client::Write (const char * buf, unsigned int length)
 {
 	unsigned int offset;
 	unsigned int bytes;
@@ -89,7 +89,7 @@ void Client::Write (char * buf, unsigned int length)
 	}
 }
 
-std::string ws_to_s(const std::wstring& wstr)
+std::string ws_to_s (const std::wstring& wstr)
 {
     std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
 
@@ -139,17 +139,30 @@ extern "C"
 		return client->Signal ();
 	}
 
-	int client_epoch ()
+	void client_get_fl_data (int * selected, int * ignored, int * epoch)
 	{
 		char * buf;
-		int epoch;
 
 		/* read epoch */
 		client->Read (&buf);
-		epoch = *((int *) buf);	
-		delete[] buf;
+		*selected = *((int *) buf);	
+		*ignored = *((int *) (buf + 4));	
+		if (epoch)
+			*epoch = *((int *) (buf + 8));	
 
-		return epoch;
+		delete[] buf;
+	}
+
+	void client_send_weight_json (wchar_t * weight)
+	{
+		std::string weight_s = ws_to_s (weight);
+		char buf[6] = { (char) TCode::Unicast, 0 };
+
+		*((unsigned int *) (buf + 1)) = weight_s.size ();
+		/* send signal, bytes */
+		client->Write(buf, 5);
+		/* send weight */
+		client->Write(weight_s.c_str (), weight_s.size ());
 	}
 
 	void client_destroy ()

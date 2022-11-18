@@ -1,9 +1,11 @@
 #ifndef _F_SERVER_H_
 # define _F_SERVER_H_
 
+# include <algorithm>
 # include <iostream>
 # include <thread>
 # include <map>
+# include <vector>
 # include <unistd.h>
 # include <netinet/in.h>
 # include <sys/socket.h>
@@ -32,7 +34,11 @@ public:
 	bool Listen (int port, int queue);
 	void Wait (int queue);
 
+	void FLStart (int epoch, int * participants, int number);
+	wchar_t ** FLReceiveWeight ();
+
 	void Broadcast (char * buf, unsigned int length);
+	void BroadcastTo (char * buf, unsigned int length, int * participants, int number);
 
 private:
 	
@@ -47,6 +53,7 @@ private:
 	struct epoll_event *events;
 
 	std::map<int, Response *> clients;
+	std::vector<int> selectedIndex;
 };
 
 #endif

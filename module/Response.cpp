@@ -21,12 +21,14 @@ void Response::SetSocket (int fd)
 	clientFd = fd;
 }
 
-void Response::Init ()
+void Response::Init (unsigned int len)
 {
+	if (buffer)
+		delete[] buffer;
 	size = -1;
 	offset = 0;
 
-	length = 2;
+	length = len + 1;
 	buffer = new char[length + 1];
 }
 
@@ -40,9 +42,34 @@ void Response::Buffering (char * buf, unsigned int bytes)
 	offset += bytes;
 }
 
+void Response::SetBHead (bool bhead)
+{
+	head = bhead;
+}
+
+bool Response::GetBHead ()
+{
+	return head;
+}
+
 void Response::SetSize (unsigned int size)
 {
 	this->size = size;
+}
+
+unsigned int Response::GetSize ()
+{
+	return size;
+}
+
+void Response::SetOffset (unsigned int offset)
+{
+	this->offset = offset;
+}
+
+unsigned int Response::GetOffset ()
+{
+	return offset;
 }
 
 void Response::SetIndex (int idx)

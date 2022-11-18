@@ -35,6 +35,14 @@ class Bridge:
 		self.server_wait.argtypes = (ctypes.c_int, )
 		self.server_wait.restype = None
 
+		self.server_FL_start = module.server_FL_start
+		self.server_FL_start.argtypes = (ctypes.c_int, ctypes.POINTER (ctypes.c_int), ctypes.c_int)
+		self.server_FL_start.restype = None
+
+		self.server_FL_receive_weight_json = module.server_FL_receive_weight_json
+		self.server_FL_receive_weight_json.argtypes = None
+		self.server_FL_receive_weight_json.restype = ctypes.POINTER (ctypes.c_wchar_p)
+
 		self.server_destroy = module.server_destroy
 		self.server_destroy.argtypes = None
 		self.server_destroy.restype = None
@@ -124,31 +132,48 @@ class Server:
 		print ("A total of {} clients connected".format (queue))
 		self.total = queue
 
+	def select_clients (self):
+		participants = []
+		for i in range (0, self.total):
+			participants.append (i)
+		return participants
+	
+	def combination_method (self, weights, participants_length):
+		avg = weights[0]
+		for index in range (1, participants_length):
+			avg += weights[index]
+		return avg / participants_length
+
 	def federated_learning (self):
-		# Weights
+		# array to store a result weights
 		self.weights_average = []
-		# Client
-		epoch = int (input ("epoch?: "))
+		# set
+		epoch = int (input ("Enter the epoch to use: "))
 		weights_size = len (self.model.get_weights ())
 		weights_offset = 0
+		participants = self.select_clients ()
+		participants_length = len (participants)
 
 		# Federated Learning
-		self.bridge.server_FL_start (epoch) # < send fl start (broadcast)
-		# Receive weights of all clients that has selected in this round
-		while weights_offset == weights_size:
-			weights_json = self.bridge.server_FL_receive_json_each () # < json of array
+		participants = (ctypes.c_int * len (participants)) (*participants)
+		self.bridge.server_FL_start (epoch, participants, participants_length)
+		# Receive weights of all clients that has been selected in this round
+		while weights_offset != weights_size:
+			weights_json = self.bridge.server_FL_receive_weight_json ()
 			# calculate the average
-			avg = json.loads (weights_json[0])
-			for index in range (1, self.total):
-				avg += json.loads (weights_json[index])
-			avg = avg / self.total
-			self.weights_average.append (avg)
+			numpy_weight = []
+			for i in range (0, participants_length):
+				numpy_weight.append (np.array (json.loads (weights_json[i])))
+			self.weights_average.append (self.combination_method (numpy_weight, participants_length))
 			# next
 			weights_offset += 1
+			print ("Receiving weights from client {}/{}".format (weights_offset, weights_size))
 
 		# update the model of server
 		self.model.set_weights (self.weights_average)
 
+	"""
+	def broadcast_model (self):
 		# update the model of client
 		weights_size = len (self.model.get_weights ())
 		weights_offset = 0	
@@ -158,7 +183,7 @@ class Server:
 			self.bridge.server_FL_send_json_each (weights_json) # < send weights of the model of server (broadcast)
 			# next
 			weights_offset += 1
-			
+	"""
 
 	def run (self):
 		while True:
