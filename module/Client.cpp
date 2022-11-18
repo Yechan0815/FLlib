@@ -49,10 +49,10 @@ int Client::Signal ()
 
 int Client::Read (char ** out_buf)
 {
-	char buf[2049];	
 	unsigned int length;
 	unsigned int offset;
 	unsigned int bytes;
+	char buf[16];
 	char *buffer;
 
 	/* get length */
@@ -64,12 +64,11 @@ int Client::Read (char ** out_buf)
 	buffer = new char[length + 1];
 	while (offset != length)
 	{
-		if ((bytes = ::read (socketFd, buf, length - offset)) < 0)
-			throw std::runtime_error ("client module: Read: 67 line");
-		for (unsigned int i = 0; i < bytes; ++i)
-			buffer[offset + i] = buf[i];
+		if ((bytes = ::read (socketFd, buffer + offset, length - offset)) < 0)
+			throw std::runtime_error ("client module: Read: 66 line");
 		offset += bytes;
 	}
+	buffer[length] = NULL;
 
 	*out_buf = buffer;
 	return offset;
@@ -163,6 +162,21 @@ extern "C"
 		client->Write(buf, 5);
 		/* send weight */
 		client->Write(weight_s.c_str (), weight_s.size ());
+	}
+	
+	wchar_t * client_receive_weight_json ()
+	{
+		wchar_t * result;
+		char * buf;
+
+		if (client->Signal () != (int) TCode::Broadcast)
+			throw std::runtime_error ("Server Module: server performed an undefined action during weight sharing");
+		client->Read (&buf);
+		result = new wchar_t[strlen (buf) + 2];
+		mbstowcs (result, buf, strlen (buf) + 1);
+		delete[] buf;
+
+		return result;
 	}
 
 	void client_destroy ()

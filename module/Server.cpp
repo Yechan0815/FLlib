@@ -249,6 +249,7 @@ wchar_t ** Server::FLReceiveWeight ()
 		{
 			if (*idx == it->second->GetIndex ())
 			{
+				it->second->GetBuffer ()[it->second->GetSize ()] = NULL;
 				result[count] = new wchar_t[it->second->GetSize () + 2];
 				mbstowcs (result[count], it->second->GetBuffer (), it->second->GetSize () + 1);
 				++count;
@@ -261,7 +262,7 @@ wchar_t ** Server::FLReceiveWeight ()
 	return result;
 }
 
-void Server::Broadcast (char * buf, unsigned int length)
+void Server::Broadcast (const char * buf, unsigned int length)
 {
 	struct epoll_event event;
 	std::map<int, Request> requests;
@@ -297,7 +298,7 @@ void Server::Broadcast (char * buf, unsigned int length)
 				{
 					event.data.fd = events[i].data.fd;
 					if (epoll_ctl (epollFd, EPOLL_CTL_DEL, events[i].data.fd, &event) < 0)
-						throw std::runtime_error ("Server module: epoll_ctl: 199 line");
+						throw std::runtime_error ("Server module: epoll_ctl: 299 line");
 					requests.erase (events[i].data.fd);
 				}
 			}
@@ -334,11 +335,7 @@ void Server::BroadcastTo (char * buf, unsigned int length, int * participants, i
 	{
 		ready = epoll_wait (epollFd, events, requests.size(), -1);
 		if (ready < 0)
-		{
-			std::cout << number << " " << requests.size() << std::endl;
-			std::cout << strerror (errno) << std::endl;
 			throw std::runtime_error ("Server module: epoll_wait: 235 line");
-		}
 
 		for (int i = 0; i < ready; ++i)
 		{
@@ -359,6 +356,13 @@ void Server::BroadcastTo (char * buf, unsigned int length, int * participants, i
 		if (requests.size() == 0)
 			break;
 	}
+}
+
+std::string ws_to_s (const std::wstring& wstr)
+{
+    std::wstring_convert<std::codecvt_utf8<wchar_t>, wchar_t> converter;
+
+    return converter.to_bytes(wstr);
 }
 
 extern "C"
@@ -390,6 +394,26 @@ extern "C"
 	wchar_t ** server_FL_receive_weight_json ()
 	{
 		return server->FLReceiveWeight ();
+	}
+
+	void server_FL_update_model ()
+	{
+		char buf[2] = { (char) TCode::Broadcast, 0 };
+
+		/* broadcast signal */
+		server->Broadcast (buf, 1);
+	}
+
+	void server_FL_send_weight_json (wchar_t * weight)
+	{
+		std::string weight_s = ws_to_s (weight);
+		char buf[6] = { (char) TCode::Broadcast, 0 };
+
+		*((unsigned int *) (buf + 1)) = weight_s.size ();
+		/* broadcast signal, bytes */
+		server->Broadcast (buf, 5);
+		/* broadcast weight */
+		server->Broadcast (weight_s.c_str (), weight_s.size ());
 	}
 
 	void server_destroy ()

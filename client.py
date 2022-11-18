@@ -48,7 +48,11 @@ class Bridge:
 		self.client_send_weight_json = module.client_send_weight_json
 		self.client_send_weight_json.argtypes = (ctypes.c_wchar_p, )
 		self.client_send_weight_json.restype = ctypes.c_bool
-		
+
+		self.client_receive_weight_json = module.client_receive_weight_json
+		self.client_receive_weight_json.argtypes = None 
+		self.client_receive_weight_json.restype = ctypes.c_wchar_p
+
 		self.client_destroy = module.client_destroy
 		self.client_destroy.argtypes = None
 		self.client_destroy.restype = None
@@ -182,22 +186,20 @@ class Client:
 			weights_offset += 1
 			print ("Sending weights to server {}/{}".format (weights_offset, weights_size))
 
-	"""
 	def update_model (self):
-		# Receive
 		weights_size = len (self.model.get_weights ())
 		weights_offset = 0
 
 		weights = []
-		# Receive weights of all clients that has selected in this round
-		while weights_offset == weights_size:
-			weights_json = self.bridge.client_FL_receive_json_each () # < json
-			# calculate the average
-			weights.append (json.loads (weights_json))
+		# Receive weights from server
+		while weights_offset != weights_size:
+			weights_json = self.bridge.client_receive_weight_json ()
+			weights.append (np.array (json.loads (weights_json)))
 			# next
 			weights_offset += 1
+			print ("Receiving weights from server {}/{}".format (weights_offset, weights_size))
+		# update
 		self.model.set_weights (weights)
-	"""
 
 	def ignore (self):
 		# get requirements
@@ -213,9 +215,11 @@ class Client:
 
 	def run (self):
 		while True:
+			print ("")
+			print ("Waiting...")
 			signal = self.bridge.client_signal ()
 			if signal == TCode.Select.value:
-				self.select ()
+				self.select ()	
 			elif signal == TCode.Ignore.value:
 				self.ignore ()
 			elif signal == TCode.Broadcast.value:

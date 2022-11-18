@@ -1,6 +1,8 @@
 #ifndef _F_SERVER_H_
 # define _F_SERVER_H_
 
+# include <locale>
+# include <codecvt>
 # include <algorithm>
 # include <iostream>
 # include <thread>
@@ -37,7 +39,7 @@ public:
 	void FLStart (int epoch, int * participants, int number);
 	wchar_t ** FLReceiveWeight ();
 
-	void Broadcast (char * buf, unsigned int length);
+	void Broadcast (const char * buf, unsigned int length);
 	void BroadcastTo (char * buf, unsigned int length, int * participants, int number);
 
 private:

@@ -43,6 +43,14 @@ class Bridge:
 		self.server_FL_receive_weight_json.argtypes = None
 		self.server_FL_receive_weight_json.restype = ctypes.POINTER (ctypes.c_wchar_p)
 
+		self.server_FL_send_weight_json = module.server_FL_send_weight_json
+		self.server_FL_send_weight_json.argtypes = (ctypes.c_wchar_p, )
+		self.server_FL_send_weight_json.restype = None 
+
+		self.server_FL_update_model = module.server_FL_update_model
+		self.server_FL_update_model.argtypes = None
+		self.server_FL_update_model.restype = None
+
 		self.server_destroy = module.server_destroy
 		self.server_destroy.argtypes = None
 		self.server_destroy.restype = None
@@ -172,30 +180,34 @@ class Server:
 		# update the model of server
 		self.model.set_weights (self.weights_average)
 
-	"""
 	def broadcast_model (self):
+		self.bridge.server_FL_update_model ()
 		# update the model of client
 		weights_size = len (self.model.get_weights ())
 		weights_offset = 0	
-		# Send
-		while weights_offset == weights_size:
+		# broadcast the weights of model
+		while weights_offset != weights_size:
 			weights_json = json.dumps (self.model.get_weights ()[weights_offset].tolist())
-			self.bridge.server_FL_send_json_each (weights_json) # < send weights of the model of server (broadcast)
+			self.bridge.server_FL_send_weight_json (weights_json)
 			# next
 			weights_offset += 1
-	"""
+			print ("Sending weights to client {}/{}".format (weights_offset, weights_size))
 
 	def run (self):
 		while True:
 			print ("")
 			print ("Choose an action to execute")
 			print ("1. Federeated Learning (FedAvg)")
-			print ("2. Evaluate the model")
+			print ("2. Broadcast the weights")
+			print ("3. Evaluate the model")
 			print ("4. Exit")
 			select = int (input ("Please enter the number: "))
 			if (select == 1):
 				self.federated_learning ()
-			elif (select == 2):
+				self.broadcast_model ()
+			if (select == 2):
+				self.broadcast_model ()
+			elif (select == 3):
 				self.model.evaluate ()
 			elif (select == 4):
 				break
