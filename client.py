@@ -126,11 +126,11 @@ class ClientModel:
 		print("Test accuracy:", score[1])
 
 class Client:
-	def __init__ (self, host, port):
+	def __init__ (self):
 		self.total = -1
 		self.index = -1
-		self.host = host
-		self.port = port
+		self.host = ""
+		self.port = -1
 		# resource
 		self.model = ClientModel ()
 		self.bridge = Bridge ("./libc_client.so")
@@ -139,12 +139,17 @@ class Client:
 		# model
 		self.model.load ()
 
+	def connect (self, host, port):
+		self.host = host
+		self.port = port
 		# socket
 		if not self.bridge.client_init ():
 			raise Exception('Failed to initialize socket resource')
 		if not self.bridge.client_connect (self.host, self.port):
 			raise Exception('Failed to connect to server')
-		print ("Connect to server successfully")
+		print ("\nConnect to server successfully")
+		print ("> host: {}".format (self.host))
+		print ("> port: {}".format (self.port))
 
 		# handshake
 		out_total = ctypes.c_int ()
@@ -213,10 +218,10 @@ class Client:
 		print ("> Number of Non-participants: {}".format (out_participants_ignore.value))
 		print ("> Client Index: {}".format (self.index))
 
-	def run (self):
+	def depend_on_server (self):
 		while True:
 			print ("")
-			print ("Waiting...")
+			print ("Controlled by server...")
 			signal = self.bridge.client_signal ()
 			if signal == TCode.Select.value:
 				self.select ()	
@@ -227,11 +232,41 @@ class Client:
 			elif signal == TCode.Terminate.value:
 				print ("Close signal was broadcasted from server")
 				break
+	
+	def run (self):
+		while True:
+			print ("")
+			print ("Choose an action to execute")
+			print ("1. Connect (flow control of client is done by the server)")
+			print ("2. Learning")
+			print ("3. Evaluate the model")
+			print ("4. Exit")
+			try:
+				temp = input ("Please enter the number: ")
+				select = int (temp)
+			except:
+				print ("Invalid Input:", temp)
+				continue
+			# case
+			if select == 1:
+				try:
+					host = input ("host: ")
+					port = int (input ("port: "))
+					self.connect (host, port)
+					self.depend_on_server ()
+				except:
+					print ("Failed to connect to server")
+			elif select == 2:
+				self.model.fit (int (input ("Enter the epoch to use: ")))
+			elif select == 3:
+				self.model.evaluate ()
+			elif select == 4:
+				break
 
 	def destroy (self):
 		self.bridge.client_destroy ()
 			
-client = Client ("127.0.0.1", 4242)
+client = Client ()
 client.load ()
 client.run ()
 client.destroy ()

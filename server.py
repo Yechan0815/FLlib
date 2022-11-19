@@ -201,18 +201,22 @@ class Server:
 			print ("2. Broadcast the weights")
 			print ("3. Evaluate the model")
 			print ("4. Exit")
-			select = int (input ("Please enter the number: "))
-			if (select == 1):
+			try:
+				temp = input ("Please enter the number: ")
+				select = int (temp)
+			except:
+				print ("Invalid Input:", temp)
+				continue
+			# case
+			if select == 1:
 				self.federated_learning ()
 				self.broadcast_model ()
-			if (select == 2):
+			if select == 2:
 				self.broadcast_model ()
-			elif (select == 3):
+			elif select == 3:
 				self.model.evaluate ()
-			elif (select == 4):
+			elif select == 4:
 				break
-			else:
-				print ("Invalid input")
 
 	def destroy (self):
 		self.bridge.server_destroy ()

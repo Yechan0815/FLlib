@@ -10,4 +10,4 @@ c:
 	python3 client.py
 
 clean	:
-	@rm libc_client.so libc_server.so
+	@rm libc_*.so
