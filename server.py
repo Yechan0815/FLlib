@@ -208,6 +208,7 @@ class Server:
 				print ("Invalid Input:", temp)
 				continue
 			# case
+			print ("")
 			if select == 1:
 				self.federated_learning ()
 				self.broadcast_model ()
