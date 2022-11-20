@@ -60,8 +60,8 @@ class Bridge:
 # model
 class ClientModel:
 	def __init__ (self):
-		self.total = -1
-		self.index = -1
+		self.total = 1
+		self.index = 0
 
 	def load (self):
 		num_classes = 10
