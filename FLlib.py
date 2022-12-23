@@ -2,6 +2,7 @@ from enum import Enum
 import json
 import ctypes
 import numpy as np
+import time
 
 class TCode (Enum): 
 	SYN = 0
@@ -182,9 +183,16 @@ class FLServer:
 		epoch = 1
 		participants = self.select_participants ()
 		parameters = []
+		# time
+		transfer_start = time.time ()
 		# FL
 		self.collect_and_calculate_weights (epoch, participants, parameters)
 		self.broadcast_weight ()
+		# time
+		transfer_end = time.time ()
+		print ()
+		print (f"total elapsed time: {transfer_end - transfer_start:.5f} sec")
+		print ()
 
 # client
 class FLClient:
@@ -247,6 +255,8 @@ class FLClient:
 		# Learning
 		self.model.fit (out_epoch.value)
 
+		# time
+		transfer_start = time.time ()
 		# Send weights of the model of this client
 		weights_size = len (self.model.get_weights ())
 		weights_offset = 0
@@ -257,6 +267,9 @@ class FLClient:
 			# next
 			weights_offset += 1
 			print ("Sending weights to server {}/{}".format (weights_offset, weights_size))
+		transfer_end = time.time ()
+		print ()
+		print (f"elapsed time for sending: {transfer_end - transfer_start:.5f} sec")
 
 	def ignore (self):
 		# get requirements
@@ -274,8 +287,11 @@ class FLClient:
 		weights_size = len (self.model.get_weights ())
 		weights_offset = 0
 
+		# time
+		transfer_start = time.time ()
+		# receive
 		weights = []
-		# Receive weights from server
+		# receive weights from server
 		while weights_offset != weights_size:
 			weights_json = self.bridge.client_receive_weight_json ()
 			weights.append (np.array (json.loads (weights_json)))
@@ -284,6 +300,10 @@ class FLClient:
 			print ("Receiving weights from server {}/{}".format (weights_offset, weights_size))
 		# update
 		self.model.set_weights (weights)
+		# time
+		transfer_end = time.time ()
+		print ()
+		print (f"elapsed time for receiving: {transfer_end - transfer_start:.5f} sec")
 
 	def depend_on_server (self):
 		while True:
