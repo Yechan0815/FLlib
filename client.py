@@ -1,64 +1,14 @@
-from enum import Enum
-import json
-import ssl
-import ctypes
-import numpy as np
 from tensorflow import keras
 from tensorflow.keras import layers
+import ssl
+import numpy as np
+from FLlib import FLModel, FLClient
 
 # MNIST SSL certification
 ssl._create_default_https_context = ssl._create_unverified_context
 
-class TCode (Enum): 
-	SYN = 0
-	ACK = 1
-	Select = 2
-	Ignore = 3
-	Unicast = 4
-	Broadcast = 5
-	Terminate = 6
-
-# bridge
-class Bridge:
-	def __init__ (self, path):
-		module = ctypes.cdll.LoadLibrary(path)
-
-		self.client_init = module.client_init
-		self.client_init.argtypes = None
-		self.client_init.restype = ctypes.c_bool
-
-		self.client_connect = module.client_connect
-		self.client_connect.argtypes = (ctypes.c_wchar_p, ctypes.c_int)
-		self.client_connect.restype = ctypes.c_bool
-
-		self.client_handshake = module.client_handshake
-		self.client_handshake.argtypes = (ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int))
-		self.client_handshake.restype = None 
-
-		self.client_signal = module.client_signal
-		self.client_signal.argtypes = None
-		self.client_signal.restype = ctypes.c_int
-
-		self.client_get_fl_data = module.client_get_fl_data
-		self.client_get_fl_data.argtypes = (
-				ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int)
-		)
-		self.client_get_fl_data.restype = None
-
-		self.client_send_weight_json = module.client_send_weight_json
-		self.client_send_weight_json.argtypes = (ctypes.c_wchar_p, )
-		self.client_send_weight_json.restype = ctypes.c_bool
-
-		self.client_receive_weight_json = module.client_receive_weight_json
-		self.client_receive_weight_json.argtypes = None 
-		self.client_receive_weight_json.restype = ctypes.c_wchar_p
-
-		self.client_destroy = module.client_destroy
-		self.client_destroy.argtypes = None
-		self.client_destroy.restype = None
-
 # model
-class ClientModel:
+class MNISTModel (FLModel):
 	def __init__ (self):
 		self.total = 1
 		self.index = 0
@@ -99,12 +49,6 @@ class ClientModel:
 		self.x_test = x_test
 		self.y_test = y_test
 		self.model = model
-	
-	def get_weights (self):
-		return self.model.get_weights ()
-
-	def set_weights (self, weights):
-		self.model.set_weights (weights)
 
 	def fit (self, epochs):
 		batch_size = 128
@@ -125,148 +69,43 @@ class ClientModel:
 		print("Test loss:", score[0])
 		print("Test accuracy:", score[1])
 
-class Client:
-	def __init__ (self):
-		self.total = -1
-		self.index = -1
-		self.host = ""
-		self.port = -1
-		# resource
-		self.model = ClientModel ()
-		self.bridge = Bridge ("./libc_client.so")
-
+class MNISTClient (FLClient):
 	def load (self):
+		super ().load ()
 		# model
+		self.model = MNISTModel ()
 		self.model.load ()
 
-	def connect (self, host, port):
-		self.host = host
-		self.port = port
-		# socket
-		if not self.bridge.client_init ():
-			raise Exception('Failed to initialize socket resource')
-		if not self.bridge.client_connect (self.host, self.port):
-			raise Exception('Failed to connect to server')
-		print ("\nConnect to server successfully")
-		print ("> host: {}".format (self.host))
-		print ("> port: {}".format (self.port))
+def main ():
+    client = MNISTClient ()
+    client.load ()
+    while True:
+        print ("")
+        print ("Choose an action to execute")
+        print ("1. Connect (flow control of client is done by the server)")
+        print ("2. Learning")
+        print ("3. Evaluate the model")
+        print ("4. Exit")
+        try:
+            temp = input ("Please enter the number: ")
+            select = int (temp)
+        except:
+            print ("Invalid Input:", temp)
+            continue
+        # case
+        if select == 1:
+            try:
+                host = input ("host: ")
+                port = int (input ("port: "))
+                client.connect (host, port)
+            except:
+                print ("Failed to connect to server")
+        elif select == 2:
+            client.model.fit (int (input ("Enter the epoch to use: ")))
+        elif select == 3:
+            client.model.evaluate ()
+        elif select == 4:
+            break
 
-		# handshake
-		out_total = ctypes.c_int ()
-		out_index = ctypes.c_int ()
-		self.bridge.client_handshake (out_total, out_index)
-		if out_total.value < 0:
-			raise Exception('Failed to handshaek')
-		self.total = out_total.value
-		self.index = out_index.value
-		self.model.total = self.total
-		self.model.index = self.index
-		print ("Successful handshake with server: Assigned client index: {}/0-{}".format(self.index, self.total - 1))
-	
-	def select (self):
-		# get requirements
-		out_participants_select = ctypes.c_int ()
-		out_participants_ignore = ctypes.c_int ()
-		out_epoch = ctypes.c_int ()
-		self.bridge.client_get_fl_data (out_participants_select, out_participants_ignore, out_epoch)
-
-		print ("Client index {} was selected for this round of federated learning".format (self.index))
-		print ("> Total number of clients: {}".format (self.total))
-		print ("> Number of Participants: {}".format (out_participants_select.value))
-		print ("> Number of Non-participants: {}".format (out_participants_ignore.value))
-		print ("> Client Index: {}".format (self.index))
-		print ("> Required Epoch: {}".format (out_epoch.value))
-
-		# Learning
-		self.model.fit (out_epoch.value)
-
-		# Send weights of the model of this client
-		weights_size = len (self.model.get_weights ())
-		weights_offset = 0
-		# Send
-		while weights_offset != weights_size:
-			weights_json = json.dumps (self.model.get_weights ()[weights_offset].tolist())
-			self.bridge.client_send_weight_json (weights_json)
-			# next
-			weights_offset += 1
-			print ("Sending weights to server {}/{}".format (weights_offset, weights_size))
-
-	def update_model (self):
-		weights_size = len (self.model.get_weights ())
-		weights_offset = 0
-
-		weights = []
-		# Receive weights from server
-		while weights_offset != weights_size:
-			weights_json = self.bridge.client_receive_weight_json ()
-			weights.append (np.array (json.loads (weights_json)))
-			# next
-			weights_offset += 1
-			print ("Receiving weights from server {}/{}".format (weights_offset, weights_size))
-		# update
-		self.model.set_weights (weights)
-
-	def ignore (self):
-		# get requirements
-		out_participants_select = ctypes.c_int ()
-		out_participants_ignore = ctypes.c_int ()
-		self.bridge.client_get_fl_data (out_participants_select, out_participants_ignore, None)
-
-		print ("Client index {} was not selected for this round of federated learning".format (self.index))
-		print ("> Total number of clients: {}".format (self.total))
-		print ("> Number of Participants: {}".format (out_participants_select.value))
-		print ("> Number of Non-participants: {}".format (out_participants_ignore.value))
-		print ("> Client Index: {}".format (self.index))
-
-	def depend_on_server (self):
-		while True:
-			print ("")
-			print ("Controlled by server...")
-			signal = self.bridge.client_signal ()
-			if signal == TCode.Select.value:
-				self.select ()	
-			elif signal == TCode.Ignore.value:
-				self.ignore ()
-			elif signal == TCode.Broadcast.value:
-				self.update_model ()
-			elif signal == TCode.Terminate.value:
-				print ("Close signal was broadcasted from server")
-				break
-	
-	def run (self):
-		while True:
-			print ("")
-			print ("Choose an action to execute")
-			print ("1. Connect (flow control of client is done by the server)")
-			print ("2. Learning")
-			print ("3. Evaluate the model")
-			print ("4. Exit")
-			try:
-				temp = input ("Please enter the number: ")
-				select = int (temp)
-			except:
-				print ("Invalid Input:", temp)
-				continue
-			# case
-			if select == 1:
-				try:
-					host = input ("host: ")
-					port = int (input ("port: "))
-					self.connect (host, port)
-					self.depend_on_server ()
-				except:
-					print ("Failed to connect to server")
-			elif select == 2:
-				self.model.fit (int (input ("Enter the epoch to use: ")))
-			elif select == 3:
-				self.model.evaluate ()
-			elif select == 4:
-				break
-
-	def destroy (self):
-		self.bridge.client_destroy ()
-			
-client = Client ()
-client.load ()
-client.run ()
-client.destroy ()
+if __name__ == "__main__":
+    main ()

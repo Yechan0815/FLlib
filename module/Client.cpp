@@ -68,7 +68,7 @@ int Client::Read (char ** out_buf)
 			throw std::runtime_error ("client module: Read: 66 line");
 		offset += bytes;
 	}
-	buffer[length] = NULL;
+	buffer[length] = '\0';
 
 	*out_buf = buffer;
 	return offset;
@@ -177,6 +177,11 @@ extern "C"
 		delete[] buf;
 
 		return result;
+	}
+
+	void client_free_weight_json (wchar_t * arr)
+	{
+		delete[] arr;
 	}
 
 	void client_destroy ()

@@ -249,7 +249,7 @@ wchar_t ** Server::FLReceiveWeight ()
 		{
 			if (*idx == it->second->GetIndex ())
 			{
-				it->second->GetBuffer ()[it->second->GetSize ()] = NULL;
+				it->second->GetBuffer ()[it->second->GetSize ()] = '\0';
 				result[count] = new wchar_t[it->second->GetSize () + 2];
 				mbstowcs (result[count], it->second->GetBuffer (), it->second->GetSize () + 1);
 				++count;
@@ -394,6 +394,13 @@ extern "C"
 	wchar_t ** server_FL_receive_weight_json ()
 	{
 		return server->FLReceiveWeight ();
+	}
+
+	void server_free_weight_json (wchar_t ** arr, int number)
+	{
+		for (int i = 0; i < number; i++)
+			delete[] arr[i];
+		delete[] arr;
 	}
 
 	void server_FL_update_model ()
