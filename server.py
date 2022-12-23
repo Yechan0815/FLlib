@@ -2,6 +2,7 @@ from tensorflow import keras
 from tensorflow.keras import layers
 import ssl
 import numpy as np
+import time
 from FLlib import FLModel, FLServer
 
 # MNIST SSL certification
@@ -66,6 +67,22 @@ class MNISTServer (FLServer):
 		# model
 		self.model = MNISTModel ()
 		self.model.load ()
+
+	def federated_learning (self):
+		epoch = 1
+		participants = self.select_participants ()
+		# can use parameters for custom signal
+		parameters = [10, 9, 8, 7, 6, 5]
+		# time
+		transfer_start = time.time ()
+		# FL
+		self.collect_and_calculate_weights (epoch, participants, parameters)
+		self.broadcast_weight ()
+		# time
+		transfer_end = time.time ()
+		print ()
+		print (f"total elapsed time: {transfer_end - transfer_start:.5f} sec")
+		print ()
 
 def main ():
 	# port, max number of client connections

@@ -36,7 +36,7 @@ public:
 	bool Listen (int port, int queue);
 	void Wait (int queue);
 
-	void FLStart (int epoch, int * participants, int number);
+	void FLStart (int epoch, int * participants, int number, int * param, int length);
 	wchar_t ** FLReceiveWeight ();
 
 	void Broadcast (const char * buf, unsigned int length);

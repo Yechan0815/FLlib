@@ -76,9 +76,9 @@ class ClientBridge:
 
 		self.client_get_fl_data = module.client_get_fl_data
 		self.client_get_fl_data.argtypes = (
-				ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int)
+				ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int), ctypes.POINTER(ctypes.c_int)
 		)
-		self.client_get_fl_data.restype = None
+		self.client_get_fl_data.restype = ctypes.POINTER(ctypes.c_int)
 
 		self.client_send_weight_json = module.client_send_weight_json
 		self.client_send_weight_json.argtypes = (ctypes.c_wchar_p, )
@@ -143,11 +143,14 @@ class FLServer:
 		# set
 		weights_size = len (self.model.get_weights ())
 		weights_offset = 0
+
 		participants_length = len (participants)
+		parameters_length = len (parameters)
+		participants = (ctypes.c_int * len (participants)) (*participants)
+		parameters = (ctypes.c_int * len (parameters)) (*parameters)
 
 		# Federated Learning
-		participants = (ctypes.c_int * len (participants)) (*participants)
-		self.bridge.server_FL_start (epoch, participants, participants_length)
+		self.bridge.server_FL_start (epoch, participants, participants_length, parameters, parameters_length)
 		# Receive weights of all clients that has been selected in this round
 		while weights_offset != weights_size:
 			weights_json = self.bridge.server_FL_receive_weight_json ()
@@ -243,7 +246,13 @@ class FLClient:
 		out_participants_select = ctypes.c_int ()
 		out_participants_ignore = ctypes.c_int ()
 		out_epoch = ctypes.c_int ()
-		self.bridge.client_get_fl_data (out_participants_select, out_participants_ignore, out_epoch)
+		out_length = ctypes.c_int ()
+		
+		parameters = []
+		param = self.bridge.client_get_fl_data (out_participants_select, out_participants_ignore, out_epoch, out_length)
+		if out_length.value > 0:
+			for i in range (0, out_length.value):
+				parameters.append (param [i])
 
 		print ("Client index {} was selected for this round of federated learning".format (self.index))
 		print ("> Total number of clients: {}".format (self.total))
@@ -251,9 +260,10 @@ class FLClient:
 		print ("> Number of Non-participants: {}".format (out_participants_ignore.value))
 		print ("> Client Index: {}".format (self.index))
 		print ("> Required Epoch: {}".format (out_epoch.value))
+		print ("> parameters:", parameters)
 
 		# Learning
-		self.model.fit (out_epoch.value)
+		self.model.fit (out_epoch.value, parameters)
 
 		# time
 		transfer_start = time.time ()
@@ -275,7 +285,7 @@ class FLClient:
 		# get requirements
 		out_participants_select = ctypes.c_int ()
 		out_participants_ignore = ctypes.c_int ()
-		self.bridge.client_get_fl_data (out_participants_select, out_participants_ignore, None)
+		self.bridge.client_get_fl_data (out_participants_select, out_participants_ignore, None, None)
 
 		print ("Client index {} was not selected for this round of federated learning".format (self.index))
 		print ("> Total number of clients: {}".format (self.total))

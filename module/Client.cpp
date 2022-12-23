@@ -138,18 +138,29 @@ extern "C"
 		return client->Signal ();
 	}
 
-	void client_get_fl_data (int * selected, int * ignored, int * epoch)
+	int * client_get_fl_data (int * selected, int * ignored, int * epoch, int * length)
 	{
 		char * buf;
+		int * param = NULL;
+		int bytes;
 
 		/* read epoch */
-		client->Read (&buf);
+		bytes = client->Read (&buf);
 		*selected = *((int *) buf);	
 		*ignored = *((int *) (buf + 4));	
 		if (epoch)
 			*epoch = *((int *) (buf + 8));	
+		if (length)
+		{
+			*length = (bytes - 12) / 4;
+			param = new int[*length + 1];
+			for (int i = 0; i < *length; i++)
+				param[i] = *((int *) (buf + 12 + i * 4));
+		}
 
 		delete[] buf;
+
+		return param;
 	}
 
 	void client_send_weight_json (wchar_t * weight)

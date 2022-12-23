@@ -134,11 +134,11 @@ void Server::Wait (int queue)
 		throw std::runtime_error ("Server module: epoll_ctl: 133 line");
 }
 
-void Server::FLStart (int epoch, int * participants, int number)
+void Server::FLStart (int epoch, int * participants, int number, int * param, int length)
 {
 	std::vector<int> target (participants, participants + number);
 	std::vector<int> ignoredIndex;
-	char buf[18] = { 0, };
+	char buf[2048] = { 0, };
 
 	selectedIndex.clear ();
 	/* split */
@@ -152,13 +152,15 @@ void Server::FLStart (int epoch, int * participants, int number)
 
 	/* Code, Bytes, Selected participants, Ignored participants, Epoch */
 	*buf = (char) TCode::Select;
-	*((unsigned int *) (buf + 1)) = 12;
+	*((unsigned int *) (buf + 1)) = 12 + length * 4;
 	*((int *) (buf + 5)) = static_cast<int> (selectedIndex.size ());
 	*((int *) (buf + 9)) = static_cast<int> (ignoredIndex.size ());
 	*((int *) (buf + 13)) = epoch;
+	for (int i = 0; i < length; i++)
+		*((int *) (buf + 17 + 4 * i)) = param[i];
 	/* broadcast to selected clients */
 	if (selectedIndex.size () != 0)
-		BroadcastTo (buf, 17, &selectedIndex[0], static_cast<int> (selectedIndex.size ()));
+		BroadcastTo (buf, 17 + length * 4, &selectedIndex[0], static_cast<int> (selectedIndex.size ()));
 
 	/* broadcast to ignored clients */
 	*buf = (char) TCode::Ignore;
@@ -386,9 +388,9 @@ extern "C"
 		server->Wait (queue);
 	}
 
-	void server_FL_start (int epoch, int * participants, int number)
+	void server_FL_start (int epoch, int * participants, int number, int * param, int length)
 	{
-		server->FLStart (epoch, participants, number);
+		server->FLStart (epoch, participants, number, param, length);
 	}
 
 	wchar_t ** server_FL_receive_weight_json ()

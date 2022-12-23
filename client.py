@@ -50,7 +50,7 @@ class MNISTModel (FLModel):
 		self.y_test = y_test
 		self.model = model
 
-	def fit (self, epochs):
+	def fit (self, epochs, parameters):
 		batch_size = 128
 
 		train_size = int (len (self.x_train) / self.total)
