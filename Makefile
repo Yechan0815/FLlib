@@ -7,8 +7,8 @@ CLIENT_SRCS	= module/Client.cpp
 SERVER_OBJS	= $(patsubst %.cpp,%.o,$(SERVER_SRCS))
 CLIENT_OBJS	= $(patsubst %.cpp,%.o,$(CLIENT_SRCS))
 
-SERVER_MODULE = libc_server.so
-CLIENT_MODULE = libc_client.so
+SERVER_MODULE = module/libc_server.so
+CLIENT_MODULE = module/libc_client.so
 
 all: $(SERVER_MODULE) $(CLIENT_MODULE)
 

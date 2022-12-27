@@ -102,7 +102,7 @@ class FLServer:
 		self.port = port
 		self.max_client = max_client
 		# resource
-		self.bridge = ServerBridge ("./libc_server.so")
+		self.bridge = ServerBridge ("./module/libc_server.so")
 		# FL
 		self.total = -1
 	
@@ -205,7 +205,7 @@ class FLClient:
 		self.host = ""
 		self.port = -1
 		# resource
-		self.bridge = ClientBridge ("./libc_client.so")
+		self.bridge = ClientBridge ("./module/libc_client.so")
 
 	def __del__ (self):
 		self.bridge.client_destroy ()

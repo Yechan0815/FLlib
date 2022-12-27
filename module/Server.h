@@ -19,6 +19,8 @@
 # include "Request.h"
 # include "protocol.h"
 
+# define CUSTOM_PARAMETER_MAX_NUMBER 42
+
 enum class Status
 {
 	WAITING,

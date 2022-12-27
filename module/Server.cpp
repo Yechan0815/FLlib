@@ -138,7 +138,8 @@ void Server::FLStart (int epoch, int * participants, int number, int * param, in
 {
 	std::vector<int> target (participants, participants + number);
 	std::vector<int> ignoredIndex;
-	char buf[2048] = { 0, };
+	/* 17 + max number of custom parameters * 4 + 1(safe) */
+	char buf[17 + CUSTOM_PARAMETER_MAX_NUMBER * 4 + 1] = { 0, };
 
 	selectedIndex.clear ();
 	/* split */
