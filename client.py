@@ -82,7 +82,7 @@ def main ():
     while True:
         print ("")
         print ("Choose an action to execute")
-        print ("1. Connect (flow control of client is done by the server)")
+        print ("1. Connect (client's flow is controlled by the server)")
         print ("2. Learning")
         print ("3. Evaluate the model")
         print ("4. Exit")
